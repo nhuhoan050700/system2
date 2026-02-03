@@ -116,8 +116,8 @@ export default function Home() {
   }, [])
 
   const googleLogin = useGoogleLogin({
+    flow: 'implicit',
     prompt: 'select_account',
-    ux_mode: 'popup',
     onSuccess: async (tokenResponse) => { await doCheckIn(tokenResponse.access_token) },
     onError: (err) => {
       console.error('Google sign-in error:', err)
@@ -126,8 +126,8 @@ export default function Home() {
   })
 
   const googleLoginRedirect = useGoogleLogin({
+    flow: 'implicit',
     prompt: 'select_account',
-    ux_mode: 'redirect',
     onSuccess: async (tokenResponse) => { await doCheckIn(tokenResponse.access_token) },
     onError: (err) => {
       console.error('Google sign-in error:', err)

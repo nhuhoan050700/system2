@@ -53,12 +53,8 @@ Test: open `https://yourname.app.n8n.cloud/webhook/procedures` in a browser; you
    | Name | Value |
    |-----|--------|
    | `NEXT_PUBLIC_N8N_WEBHOOK_URL` | `https://yourname.app.n8n.cloud/webhook` |
-   | `NEXT_PUBLIC_APP_URL` | `https://your-project.vercel.app` (your frontend URL) |
    | `NEXT_PUBLIC_GOOGLE_CLIENT_ID` | Your Google OAuth client ID |
    | `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` | `pk_live_...` or `pk_test_...` |
-   | `SEPAY_MERCHANT_ID` | Your SePay merchant ID |
-   | `SEPAY_SECRET_KEY` | Your SePay secret key |
-   | `SEPAY_ENV` | `sandbox` or `production` |
 
 5. **Deploy**. Vercel will give you a URL like `https://your-project.vercel.app`.
 

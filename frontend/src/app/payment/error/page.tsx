@@ -1,9 +1,10 @@
 'use client'
 
+import { Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 
-export default function PaymentErrorPage() {
+function PaymentErrorContent() {
   const searchParams = useSearchParams()
   const order = searchParams.get('order') || ''
 
@@ -27,5 +28,13 @@ export default function PaymentErrorPage() {
         </Link>
       </div>
     </div>
+  )
+}
+
+export default function PaymentErrorPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen flex items-center justify-center">Loading...</div>}>
+      <PaymentErrorContent />
+    </Suspense>
   )
 }
