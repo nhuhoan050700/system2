@@ -1,0 +1,82 @@
+-- Power BI DAX Measures
+-- Copy these into Power BI Desktop to create calculated measures
+
+-- Total Revenue (Today)
+Total Revenue Today = 
+CALCULATE(
+    SUM(fact_daily_revenue[total_revenue]),
+    fact_daily_revenue[revenue_date] = TODAY()
+)
+
+-- Total Orders (Today)
+Total Orders Today = 
+CALCULATE(
+    SUM(fact_daily_revenue[total_orders]),
+    fact_daily_revenue[revenue_date] = TODAY()
+)
+
+-- Completion Rate
+Completion Rate = 
+DIVIDE(
+    SUM(fact_daily_revenue[completed_orders]),
+    SUM(fact_daily_revenue[total_orders]),
+    0
+) * 100
+
+-- Average Order Value
+Average Order Value = 
+AVERAGE(fact_daily_orders[total_amount])
+
+-- Revenue Growth (Week over Week)
+Revenue Growth WoW = 
+VAR CurrentWeek = 
+    CALCULATE(
+        SUM(fact_daily_revenue[total_revenue]),
+        DATESINPERIOD(
+            fact_daily_revenue[revenue_date],
+            TODAY(),
+            -7,
+            DAY
+        )
+    )
+VAR PreviousWeek = 
+    CALCULATE(
+        SUM(fact_daily_revenue[total_revenue]),
+        DATESINPERIOD(
+            fact_daily_revenue[revenue_date],
+            TODAY() - 7,
+            -7,
+            DAY
+        )
+    )
+RETURN
+    DIVIDE(CurrentWeek - PreviousWeek, PreviousWeek, 0) * 100
+
+-- Top Procedure by Revenue
+Top Procedure = 
+TOPN(
+    1,
+    dim_procedure_performance,
+    dim_procedure_performance[total_revenue],
+    DESC
+)
+
+-- Average Processing Time
+Avg Processing Time = 
+AVERAGE(fact_daily_orders[processing_time_minutes])
+
+-- Orders by Status
+Orders by Status = 
+COUNTROWS(fact_daily_orders)
+
+-- Revenue Trend (Last 30 Days)
+Revenue Trend 30D = 
+CALCULATE(
+    SUM(fact_daily_revenue[total_revenue]),
+    DATESINPERIOD(
+        fact_daily_revenue[revenue_date],
+        TODAY(),
+        -30,
+        DAY
+    )
+)

@@ -1,0 +1,156 @@
+-- Hospital Testing Service Center Database Schema
+-- PostgreSQL Database for Railway
+
+-- Users table (stores patient information)
+CREATE TABLE IF NOT EXISTS users (
+    id SERIAL PRIMARY KEY,
+    google_id VARCHAR(255) UNIQUE,
+    email VARCHAR(255) UNIQUE NOT NULL,
+    name VARCHAR(255) NOT NULL,
+    birthday DATE,
+    phone VARCHAR(20),
+    address TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Procedures table (available medical procedures)
+CREATE TABLE IF NOT EXISTS procedures (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(255) NOT NULL,
+    description TEXT,
+    price DECIMAL(10, 2) NOT NULL,
+    duration_minutes INTEGER DEFAULT 30,
+    room_number VARCHAR(50),
+    is_active BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Orders table (patient orders/appointments)
+CREATE TABLE IF NOT EXISTS orders (
+    id SERIAL PRIMARY KEY,
+    order_number VARCHAR(50) UNIQUE NOT NULL,
+    user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+    procedure_id INTEGER REFERENCES procedures(id),
+    status VARCHAR(50) DEFAULT 'pending', -- pending, paid, assigned, in_progress, completed
+    payment_status VARCHAR(50) DEFAULT 'unpaid', -- unpaid, paid, failed
+    payment_intent_id VARCHAR(255),
+    room_number VARCHAR(50),
+    queue_number VARCHAR(50),
+    total_amount DECIMAL(10, 2),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    completed_at TIMESTAMP
+);
+
+-- Workers table (staff members)
+CREATE TABLE IF NOT EXISTS workers (
+    id SERIAL PRIMARY KEY,
+    email VARCHAR(255) UNIQUE NOT NULL,
+    name VARCHAR(255) NOT NULL,
+    role VARCHAR(100) DEFAULT 'staff',
+    is_active BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Order updates log (for tracking status changes)
+CREATE TABLE IF NOT EXISTS order_updates (
+    id SERIAL PRIMARY KEY,
+    order_id INTEGER REFERENCES orders(id) ON DELETE CASCADE,
+    worker_id INTEGER REFERENCES workers(id),
+    old_status VARCHAR(50),
+    new_status VARCHAR(50),
+    notes TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Create indexes for better performance
+CREATE INDEX IF NOT EXISTS idx_orders_user_id ON orders(user_id);
+CREATE INDEX IF NOT EXISTS idx_orders_status ON orders(status);
+CREATE INDEX IF NOT EXISTS idx_orders_order_number ON orders(order_number);
+CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
+CREATE INDEX IF NOT EXISTS idx_users_google_id ON users(google_id);
+
+-- Insert sample procedures
+INSERT INTO procedures (name, description, price, duration_minutes, room_number) VALUES
+('Blood Test', 'Complete blood count and basic panel', 50.00, 15, 'Room 2'),
+('X-Ray', 'Chest X-ray examination', 80.00, 20, 'Room 5'),
+('MRI Scan', 'Magnetic Resonance Imaging', 300.00, 45, 'Room 1'),
+('Ultrasound', 'Abdominal ultrasound scan', 120.00, 30, 'Room 3'),
+('ECG', 'Electrocardiogram test', 60.00, 15, 'Room 4')
+ON CONFLICT DO NOTHING;
+
+-- Insert sample worker
+INSERT INTO workers (email, name, role) VALUES
+('staff@hospital.com', 'Medical Staff', 'staff')
+ON CONFLICT (email) DO NOTHING;
+
+-- Function to generate order number
+CREATE OR REPLACE FUNCTION generate_order_number() RETURNS VARCHAR(50) AS $$
+DECLARE
+    new_order_number VARCHAR(50);
+    date_prefix VARCHAR(10);
+    sequence_num INTEGER;
+BEGIN
+    date_prefix := TO_CHAR(CURRENT_DATE, 'YYYYMMDD');
+    
+    -- Get the next sequence number for today
+    SELECT COALESCE(MAX(CAST(SUBSTRING(order_number FROM 10) AS INTEGER)), 0) + 1
+    INTO sequence_num
+    FROM orders
+    WHERE order_number LIKE date_prefix || '%';
+    
+    new_order_number := date_prefix || '-' || LPAD(sequence_num::TEXT, 4, '0');
+    RETURN new_order_number;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Function to generate queue number
+CREATE OR REPLACE FUNCTION generate_queue_number(proc_room VARCHAR) RETURNS VARCHAR(50) AS $$
+DECLARE
+    room_prefix VARCHAR(5);
+    queue_num INTEGER;
+    new_queue_number VARCHAR(50);
+BEGIN
+    -- Extract room prefix (e.g., "Room 2" -> "R2")
+    room_prefix := UPPER(SUBSTRING(proc_room FROM 'Room (\d+)'));
+    IF room_prefix = '' THEN
+        room_prefix := 'A';
+    ELSE
+        room_prefix := 'R' || room_prefix;
+    END IF;
+    
+    -- Get next queue number for this room today
+    SELECT COALESCE(MAX(CAST(SUBSTRING(queue_number FROM 3) AS INTEGER)), 0) + 1
+    INTO queue_num
+    FROM orders
+    WHERE room_number = proc_room
+    AND DATE(created_at) = CURRENT_DATE
+    AND queue_number IS NOT NULL;
+    
+    new_queue_number := room_prefix || '-' || LPAD(queue_num::TEXT, 3, '0');
+    RETURN new_queue_number;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Wrapper for n8n (passes array; uses first element for generate_queue_number)
+CREATE OR REPLACE FUNCTION generate_queue_number_arr(proc_room_arr anyarray) RETURNS VARCHAR(50) AS $$
+BEGIN
+  RETURN generate_queue_number(proc_room_arr[1]::text);
+END;
+$$ LANGUAGE plpgsql;
+
+-- Trigger to update updated_at timestamp
+CREATE OR REPLACE FUNCTION update_updated_at_column()
+RETURNS TRIGGER AS $$
+BEGIN
+    NEW.updated_at = CURRENT_TIMESTAMP;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER update_users_updated_at BEFORE UPDATE ON users
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+CREATE TRIGGER update_orders_updated_at BEFORE UPDATE ON orders
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();

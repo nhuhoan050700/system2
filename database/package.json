@@ -1,0 +1,10 @@
+{
+  "name": "database",
+  "private": true,
+  "scripts": {
+    "migrate": "node run-migration.js"
+  },
+  "dependencies": {
+    "pg": "^8.11.3"
+  }
+}

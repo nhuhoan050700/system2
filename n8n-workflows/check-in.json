@@ -1,0 +1,143 @@
+{
+  "name": "Hospital Check-In",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "GET",
+        "path": "check-in",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "webhook-checkin-get",
+      "name": "Check-In Webhook (GET)",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [250, 100],
+      "webhookId": "check-in-get"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { \"message\": \"Use POST to check in. This URL is for API calls, not for opening in a browser.\", \"method\": \"GET\" } }}",
+        "options": {}
+      },
+      "id": "respond-get",
+      "name": "Respond GET",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [450, 100]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "check-in",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "webhook-checkin",
+      "name": "Check-In Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [250, 300],
+      "webhookId": "check-in"
+    },
+    {
+      "parameters": {
+        "jsCode": "const item = $input.first().json;\nlet data = item.body ?? item.data ?? item.json ?? item;\nif (typeof data === 'string') data = JSON.parse(data);\nconst birthday = data.birthday != null && String(data.birthday).trim() ? String(data.birthday).trim() : null;\nreturn [{ json: {\n  google_id: data.google_id ?? null,\n  email: data.email ?? null,\n  name: data.name ?? null,\n  birthday,\n  phone: data.phone ?? null\n}}];"
+      },
+      "id": "extract-body",
+      "name": "Extract Body",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [400, 300]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO users (google_id, email, name, birthday, phone) VALUES ($1, $2, $3, $4::date, $5) ON CONFLICT (google_id) DO UPDATE SET email = EXCLUDED.email, name = EXCLUDED.name, birthday = EXCLUDED.birthday, phone = EXCLUDED.phone RETURNING *",
+        "additionalFields": {
+          "queryParameters": "={{ [$json.google_id, $json.email, $json.name, $json.birthday ?? null, $json.phone ?? null] }}"
+        }
+      },
+      "id": "create-user",
+      "name": "Create/Update User",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2,
+      "position": [600, 300]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "user-data",
+              "name": "user",
+              "value": "={{ $json }}",
+              "type": "object"
+            },
+            {
+              "id": "session-token",
+              "name": "sessionToken",
+              "value": "={{ $json.id }}-{{ $now.toMillis() }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "prepare-response",
+      "name": "Prepare Response",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3,
+      "position": [750, 300]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { \"success\": true, \"user\": $json.user, \"sessionToken\": $json.sessionToken } }}",
+        "options": {}
+      },
+      "id": "respond",
+      "name": "Respond",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [950, 300]
+    }
+  ],
+  "connections": {
+    "Check-In Webhook (GET)": {
+      "main": [[
+        { "node": "Respond GET", "type": "main", "index": 0 }
+      ]]
+    },
+    "Check-In Webhook": {
+      "main": [[
+        { "node": "Extract Body", "type": "main", "index": 0 }
+      ]]
+    },
+    "Extract Body": {
+      "main": [[
+        { "node": "Create/Update User", "type": "main", "index": 0 }
+      ]]
+    },
+    "Create/Update User": {
+      "main": [[
+        { "node": "Prepare Response", "type": "main", "index": 0 }
+      ]]
+    },
+    "Prepare Response": {
+      "main": [[
+        { "node": "Respond", "type": "main", "index": 0 }
+      ]]
+    }
+  },
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "tags": [],
+  "triggerCount": 0,
+  "updatedAt": "2026-01-26T00:00:00.000Z",
+  "versionId": "1"
+}

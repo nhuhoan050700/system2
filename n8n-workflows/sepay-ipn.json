@@ -1,0 +1,72 @@
+{
+  "name": "SePay IPN",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "sepay-ipn",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "webhook-sepay-ipn",
+      "name": "SePay IPN Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [250, 300],
+      "webhookId": "sepay-ipn"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE orders SET payment_status = 'paid', status = 'paid', payment_intent_id = COALESCE(NULLIF(TRIM($2), ''), payment_intent_id) WHERE order_number IN (SELECT trim(unnest(string_to_array($1, ',')))) AND payment_status != 'paid' RETURNING id, order_number",
+        "additionalFields": {
+          "queryParameters": "={{ [($json.body || $json).order_invoice_number, 'sepay:' + (($json.body || $json).transaction_id || 'ipn')] }}"
+        }
+      },
+      "id": "update-order-sepay",
+      "name": "Update Order (SePay)",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2,
+      "position": [450, 300],
+      "credentials": {
+        "postgres": {
+          "id": "postgres-credentials",
+          "name": "PostgreSQL Railway"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { \"success\": true, \"message\": \"Payment recorded\" } }}",
+        "options": {}
+      },
+      "id": "respond-sepay-success",
+      "name": "Respond Success",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [650, 300]
+    }
+  ],
+  "connections": {
+    "SePay IPN Webhook": {
+      "main": [[
+        { "node": "Update Order (SePay)", "type": "main", "index": 0 }
+      ]]
+    },
+    "Update Order (SePay)": {
+      "main": [[
+        { "node": "Respond Success", "type": "main", "index": 0 }
+      ]]
+    }
+  },
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "tags": [],
+  "triggerCount": 0,
+  "updatedAt": "2026-02-03T00:00:00.000Z",
+  "versionId": "1"
+}

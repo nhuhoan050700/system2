@@ -1,0 +1,190 @@
+{
+  "name": "Local Bank Payment",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "local-bank-payment",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "webhook-bank-payment",
+      "name": "Bank Payment Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [250, 300],
+      "webhookId": "local-bank-payment"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "has-order-ids",
+              "leftValue": "={{ Array.isArray($json.body.order_ids) && $json.body.order_ids.length > 0 }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "is-multi-order",
+      "name": "Multiple orders?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [450, 300]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE orders SET payment_status = 'paid', status = 'paid', payment_intent_id = COALESCE(NULLIF(TRIM($2), ''), payment_intent_id) WHERE id = ANY($1) AND payment_status != 'paid' RETURNING id, order_number",
+        "additionalFields": {
+          "queryParameters": "={{ [$('Bank Payment Webhook').item.json.body.order_ids, 'bank:' + ($('Bank Payment Webhook').item.json.body.reference || 'manual')] }}"
+        }
+      },
+      "id": "update-orders-bulk",
+      "name": "Update Orders (Bulk)",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2,
+      "position": [650, 200],
+      "credentials": {
+        "postgres": {
+          "id": "postgres-credentials",
+          "name": "PostgreSQL Railway"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE orders SET payment_status = 'paid', status = 'paid', payment_intent_id = COALESCE(NULLIF(TRIM($2), ''), payment_intent_id) WHERE id = $1 AND payment_status != 'paid' RETURNING id, order_number",
+        "additionalFields": {
+          "queryParameters": "={{ [$('Bank Payment Webhook').item.json.body.order_id, 'bank:' + ($('Bank Payment Webhook').item.json.body.reference || 'manual')] }}"
+        }
+      },
+      "id": "update-order-single",
+      "name": "Update Order (Single)",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2,
+      "position": [650, 400],
+      "credentials": {
+        "postgres": {
+          "id": "postgres-credentials",
+          "name": "PostgreSQL Railway"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combinationMode": "multiplex",
+        "options": {}
+      },
+      "id": "merge-bank",
+      "name": "Merge",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3,
+      "position": [850, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "has-rows",
+              "leftValue": "={{ $input.all().length > 0 }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "check-updated",
+      "name": "Any orders updated?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [1050, 300]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { \"success\": true, \"message\": \"Payment recorded\", \"orders\": $input.all() } }}",
+        "options": {}
+      },
+      "id": "respond-bank-success",
+      "name": "Respond Success",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [1250, 200]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { \"success\": false, \"error\": \"No orders updated. Check order_id/order_ids and payment_status.\" } }}",
+        "options": {}
+      },
+      "id": "respond-bank-failure",
+      "name": "Respond Failure",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [1250, 400]
+    }
+  ],
+  "connections": {
+    "Bank Payment Webhook": {
+      "main": [[
+        { "node": "Multiple orders?", "type": "main", "index": 0 }
+      ]]
+    },
+    "Multiple orders?": {
+      "main": [
+        [{ "node": "Update Orders (Bulk)", "type": "main", "index": 0 }],
+        [{ "node": "Update Order (Single)", "type": "main", "index": 0 }]
+      ]
+    },
+    "Update Orders (Bulk)": {
+      "main": [[{ "node": "Merge", "type": "main", "index": 0 }]]
+    },
+    "Update Order (Single)": {
+      "main": [[{ "node": "Merge", "type": "main", "index": 1 }]]
+    },
+    "Merge": {
+      "main": [[{ "node": "Any orders updated?", "type": "main", "index": 0 }]]
+    },
+    "Any orders updated?": {
+      "main": [
+        [{ "node": "Respond Success", "type": "main", "index": 0 }],
+        [{ "node": "Respond Failure", "type": "main", "index": 0 }]
+      ]
+    }
+  },
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "tags": [],
+  "triggerCount": 0,
+  "updatedAt": "2026-02-03T00:00:00.000Z",
+  "versionId": "1"
+}

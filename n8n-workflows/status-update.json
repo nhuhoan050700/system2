@@ -1,0 +1,116 @@
+{
+  "name": "Status Update",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "update-status",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "webhook-status",
+      "name": "Status Update Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [250, 300],
+      "webhookId": "update-status"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT status FROM orders WHERE id = $1",
+        "additionalFields": {}
+      },
+      "id": "get-current-status",
+      "name": "Get Current Status",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2,
+      "position": [450, 300],
+      "credentials": {
+        "postgres": {
+          "id": "postgres-credentials",
+          "name": "PostgreSQL Railway"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE orders SET status = $1, updated_at = CURRENT_TIMESTAMP, completed_at = CASE WHEN $1 = 'completed' THEN CURRENT_TIMESTAMP ELSE completed_at END WHERE id = $2 RETURNING *",
+        "additionalFields": {}
+      },
+      "id": "update-order-status",
+      "name": "Update Order Status",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2,
+      "position": [650, 300],
+      "credentials": {
+        "postgres": {
+          "id": "postgres-credentials",
+          "name": "PostgreSQL Railway"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO order_updates (order_id, worker_id, old_status, new_status, notes) VALUES ($1, $2, $3, $4, $5)",
+        "additionalFields": {}
+      },
+      "id": "log-update",
+      "name": "Log Status Update",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2,
+      "position": [850, 300],
+      "credentials": {
+        "postgres": {
+          "id": "postgres-credentials",
+          "name": "PostgreSQL Railway"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { \"success\": true, \"order\": $json } }}",
+        "options": {}
+      },
+      "id": "respond",
+      "name": "Respond",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [1050, 300]
+    }
+  ],
+  "connections": {
+    "Status Update Webhook": {
+      "main": [[
+        { "node": "Get Current Status", "type": "main", "index": 0 }
+      ]]
+    },
+    "Get Current Status": {
+      "main": [[
+        { "node": "Update Order Status", "type": "main", "index": 0 }
+      ]]
+    },
+    "Update Order Status": {
+      "main": [[
+        { "node": "Log Status Update", "type": "main", "index": 0 }
+      ]]
+    },
+    "Log Status Update": {
+      "main": [[
+        { "node": "Respond", "type": "main", "index": 0 }
+      ]]
+    }
+  },
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "tags": [],
+  "triggerCount": 0,
+  "updatedAt": "2026-01-26T00:00:00.000Z",
+  "versionId": "1"
+}

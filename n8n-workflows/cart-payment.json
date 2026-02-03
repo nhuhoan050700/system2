@@ -1,0 +1,151 @@
+{
+  "name": "Cart Payment",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "cart-payment",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "webhook-cart-payment",
+      "name": "Cart Payment Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [250, 300],
+      "webhookId": "cart-payment"
+    },
+    {
+      "parameters": {
+        "operation": "create",
+        "amount": "={{ $json.body.amount }}",
+        "currency": "usd",
+        "paymentMethodId": "={{ $json.body.paymentMethodId }}",
+        "additionalFields": {
+          "confirmationMethod": "automatic",
+          "confirm": true
+        }
+      },
+      "id": "stripe-payment",
+      "name": "Process Stripe Payment",
+      "type": "n8n-nodes-base.stripe",
+      "typeVersion": 1,
+      "position": [450, 300],
+      "credentials": {
+        "stripeApi": {
+          "id": "stripe-credentials",
+          "name": "Stripe API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "payment-success",
+              "leftValue": "={{ $json.status }}",
+              "rightValue": "succeeded",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "check-payment",
+      "name": "Payment Successful?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [650, 300]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE orders SET payment_status = 'paid', payment_intent_id = $2, status = 'paid' WHERE id = ANY($1) RETURNING id",
+        "additionalFields": {
+          "queryParameters": "={{ [$('Cart Payment Webhook').item.json.body.order_ids, $('Process Stripe Payment').item.json.id] }}"
+        }
+      },
+      "id": "update-orders",
+      "name": "Update Orders Status",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2,
+      "position": [850, 200],
+      "credentials": {
+        "postgres": {
+          "id": "postgres-credentials",
+          "name": "PostgreSQL Railway"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { \"success\": true, \"payment\": { \"status\": \"succeeded\", \"intentId\": $('Process Stripe Payment').item.json.id } } }}",
+        "options": {}
+      },
+      "id": "respond-success",
+      "name": "Respond Success",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [1050, 200]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { \"success\": false, \"error\": \"Payment failed\", \"status\": $('Process Stripe Payment').item.json.status } }}",
+        "options": {}
+      },
+      "id": "respond-failure",
+      "name": "Respond Failure",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [850, 400]
+    }
+  ],
+  "connections": {
+    "Cart Payment Webhook": {
+      "main": [[
+        { "node": "Process Stripe Payment", "type": "main", "index": 0 }
+      ]]
+    },
+    "Process Stripe Payment": {
+      "main": [[
+        { "node": "Payment Successful?", "type": "main", "index": 0 }
+      ]]
+    },
+    "Payment Successful?": {
+      "main": [
+        [
+          { "node": "Update Orders Status", "type": "main", "index": 0 }
+        ],
+        [
+          { "node": "Respond Failure", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Update Orders Status": {
+      "main": [[
+        { "node": "Respond Success", "type": "main", "index": 0 }
+      ]]
+    }
+  },
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "tags": [],
+  "triggerCount": 0,
+  "updatedAt": "2026-01-26T00:00:00.000Z",
+  "versionId": "1"
+}

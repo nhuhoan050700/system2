@@ -1,0 +1,95 @@
+{
+  "name": "Update Profile",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "update-profile",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "webhook-update-profile",
+      "name": "Update Profile Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [250, 300],
+      "webhookId": "update-profile"
+    },
+    {
+      "parameters": {
+        "jsCode": "const item = $input.first().json;\nlet data = item.body ?? item.data ?? item ?? {};\nif (typeof data === 'string') data = JSON.parse(data);\nconst user_id = data.user_id != null ? Number(data.user_id) : null;\nconst name = data.name != null ? String(data.name) : null;\nconst birthday = data.birthday != null && String(data.birthday).trim() ? String(data.birthday).trim() : null;\nconst phone = data.phone !== undefined && data.phone !== null ? String(data.phone) : null;\nconst address = data.address != null && String(data.address).trim() ? String(data.address).trim() : null;\nif (user_id == null) throw new Error('user_id required');\nreturn [{ json: { user_id, name, birthday, phone, address } }];"
+      },
+      "id": "extract-body",
+      "name": "Extract Body",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [450, 300]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE users SET name = COALESCE($2, name), birthday = $3, phone = $4, address = $5, updated_at = CURRENT_TIMESTAMP WHERE id = $1 RETURNING id, email, name, birthday, phone, address",
+        "additionalFields": {
+          "queryParameters": "={{ [$json.user_id, $json.name, $json.birthday, $json.phone, $json.address] }}"
+        }
+      },
+      "id": "update-user",
+      "name": "Update User",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2,
+      "position": [650, 300]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "user",
+              "name": "user",
+              "value": "={{ $json }}",
+              "type": "object"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "prepare-response",
+      "name": "Prepare Response",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3,
+      "position": [850, 300]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { \"success\": true, \"user\": $json.user } }}",
+        "options": {}
+      },
+      "id": "respond",
+      "name": "Respond",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [1050, 300]
+    }
+  ],
+  "connections": {
+    "Update Profile Webhook": {
+      "main": [[{ "node": "Extract Body", "type": "main", "index": 0 }]]
+    },
+    "Extract Body": {
+      "main": [[{ "node": "Update User", "type": "main", "index": 0 }]]
+    },
+    "Update User": {
+      "main": [[{ "node": "Prepare Response", "type": "main", "index": 0 }]]
+    },
+    "Prepare Response": {
+      "main": [[{ "node": "Respond", "type": "main", "index": 0 }]]
+    }
+  },
+  "pinData": {},
+  "settings": { "executionOrder": "v1" },
+  "staticData": null,
+  "tags": [],
+  "triggerCount": 0,
+  "versionId": "1"
+}

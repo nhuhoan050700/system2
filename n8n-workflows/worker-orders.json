@@ -1,0 +1,70 @@
+{
+  "name": "Worker Orders List",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "GET",
+        "path": "worker-orders",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "webhook-orders",
+      "name": "Worker Orders Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [250, 300],
+      "webhookId": "worker-orders"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT o.*, u.name as user_name, p.name as procedure_name FROM orders o JOIN users u ON o.user_id = u.id JOIN procedures p ON o.procedure_id = p.id WHERE ($1::text IS NULL OR o.status = $1) ORDER BY o.created_at DESC LIMIT 100",
+        "additionalFields": {}
+      },
+      "id": "get-orders",
+      "name": "Get Orders",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2,
+      "position": [450, 300],
+      "credentials": {
+        "postgres": {
+          "id": "postgres-credentials",
+          "name": "PostgreSQL Railway"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { \"success\": true, \"orders\": $json } }}",
+        "options": {}
+      },
+      "id": "respond",
+      "name": "Respond",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [650, 300]
+    }
+  ],
+  "connections": {
+    "Worker Orders Webhook": {
+      "main": [[
+        { "node": "Get Orders", "type": "main", "index": 0 }
+      ]]
+    },
+    "Get Orders": {
+      "main": [[
+        { "node": "Respond", "type": "main", "index": 0 }
+      ]]
+    }
+  },
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "tags": [],
+  "triggerCount": 0,
+  "updatedAt": "2026-01-26T00:00:00.000Z",
+  "versionId": "1"
+}
