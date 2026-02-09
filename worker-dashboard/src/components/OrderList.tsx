@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { formatVnd } from '@/lib/format'
 
 interface Order {
   id: number
@@ -18,7 +19,7 @@ interface Order {
 export default function OrderList() {
   const [orders, setOrders] = useState<Order[]>([])
   const [loading, setLoading] = useState(true)
-  const [filter, setFilter] = useState<string>('all')
+  const [filter, setFilter] = useState<string>('paid')
 
   useEffect(() => {
     fetchOrders()
@@ -118,6 +119,12 @@ export default function OrderList() {
           >
             In Progress
           </button>
+          <button
+            onClick={() => setFilter('completed')}
+            className={`px-4 py-2 rounded-lg ${filter === 'completed' ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-700'}`}
+          >
+            Done
+          </button>
         </div>
       </div>
 
@@ -126,7 +133,7 @@ export default function OrderList() {
           <thead>
             <tr className="border-b">
               <th className="text-left p-3">Order #</th>
-              <th className="text-left p-3">Patient</th>
+              <th className="text-left p-3">Customer</th>
               <th className="text-left p-3">Procedure</th>
               <th className="text-left p-3">Room</th>
               <th className="text-left p-3">Queue</th>
@@ -163,24 +170,24 @@ export default function OrderList() {
                       {order.status.replace('_', ' ').toUpperCase()}
                     </span>
                   </td>
-                  <td className="p-3">${order.total_amount.toFixed(2)}</td>
+                  <td className="p-3">{formatVnd(Number(order.total_amount))}</td>
                   <td className="p-3">
                     <div className="flex gap-2">
-                      {order.status === 'paid' && (
-                        <button
-                          onClick={() => updateOrderStatus(order.id, 'in_progress')}
-                          className="bg-orange-600 hover:bg-orange-700 text-white text-sm px-3 py-1 rounded"
-                        >
-                          Start Test
-                        </button>
-                      )}
-                      {order.status === 'in_progress' && (
-                        <button
-                          onClick={() => updateOrderStatus(order.id, 'completed')}
-                          className="bg-green-600 hover:bg-green-700 text-white text-sm px-3 py-1 rounded"
-                        >
-                          Mark Completed
-                        </button>
+                      {(order.status === 'paid' || order.status === 'in_progress') && (
+                        <>
+                          <button
+                            onClick={() => updateOrderStatus(order.id, 'in_progress')}
+                            className={`text-sm px-3 py-1 rounded ${order.status === 'in_progress' ? 'bg-orange-600 text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'}`}
+                          >
+                            Not done
+                          </button>
+                          <button
+                            onClick={() => updateOrderStatus(order.id, 'completed')}
+                            className="bg-green-600 hover:bg-green-700 text-white text-sm px-3 py-1 rounded"
+                          >
+                            Done
+                          </button>
+                        </>
                       )}
                     </div>
                   </td>

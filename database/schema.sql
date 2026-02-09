@@ -80,6 +80,11 @@ INSERT INTO procedures (name, description, price, duration_minutes, room_number)
 ('ECG', 'Electrocardiogram test', 60.00, 15, 'Room 4')
 ON CONFLICT DO NOTHING;
 
+-- Test procedure (10000 VND)
+INSERT INTO procedures (name, description, price, duration_minutes, room_number) VALUES
+('Test', 'Test - 10000 VND', 10000.00, 15, 'Room 6')
+ON CONFLICT DO NOTHING;
+
 -- Insert sample worker
 INSERT INTO workers (email, name, role) VALUES
 ('staff@hospital.com', 'Medical Staff', 'staff')

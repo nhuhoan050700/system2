@@ -21,7 +21,7 @@ const STATUS_STYLES: Record<string, { bg: string; text: string; label: string }>
   paid: { bg: 'bg-blue-100', text: 'text-blue-800', label: 'Paid' },
   assigned: { bg: 'bg-purple-100', text: 'text-purple-800', label: 'Assigned' },
   in_progress: { bg: 'bg-orange-100', text: 'text-orange-800', label: 'In progress' },
-  completed: { bg: 'bg-green-100', text: 'text-green-800', label: 'Completed' },
+  completed: { bg: 'bg-emerald-100', text: 'text-emerald-800', label: 'Done' },
 }
 
 export default function OrderStatus({ orders: initialOrders }: OrderStatusProps) {
@@ -62,53 +62,64 @@ export default function OrderStatus({ orders: initialOrders }: OrderStatusProps)
   }, [])
 
   return (
-    <div className="max-w-app mx-auto space-y-4">
+    <div className="max-w-app mx-auto space-y-5">
+      <p className="text-[13px] text-[var(--app-text-secondary)] font-medium px-0.5">Your orders</p>
       {orders.map((order) => {
         const style = STATUS_STYLES[order.status] || { bg: 'bg-gray-100', text: 'text-gray-800', label: order.status }
+        const isActive = order.status === 'in_progress'
+        const isDone = order.status === 'completed'
         return (
-          <div key={order.id} className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm">
-            <div className="flex justify-between items-start gap-3 mb-3">
-              <div className="min-w-0 flex-1">
-                <p className="text-xs text-gray-500">Order</p>
-                <p className="font-semibold text-gray-900 truncate">{order.order_number}</p>
+          <div
+            key={order.id}
+            className={`bg-white rounded-2xl overflow-hidden shadow-sm border transition-all duration-200 ${
+              isActive ? 'border-orange-200 ring-1 ring-orange-100' : 'border-gray-100'
+            } ${isDone ? 'opacity-95' : ''}`}
+          >
+            <div className="p-5">
+              <div className="flex justify-between items-start gap-3 mb-2">
+                <div className="min-w-0 flex-1">
+                  <p className="text-[11px] uppercase tracking-wider text-[var(--app-text-secondary)] font-semibold">Order</p>
+                  <p className="font-semibold text-gray-900 text-[15px] truncate mt-0.5">{order.order_number}</p>
+                </div>
+                <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold uppercase tracking-wide ${style.bg} ${style.text}`}>
+                  {style.label}
+                </span>
               </div>
-              <span className={`px-3 py-1 rounded-full text-xs font-medium ${style.bg} ${style.text}`}>
-                {style.label}
-              </span>
+              {order.procedure_name && (
+                <p className="text-[13px] text-[var(--app-text-secondary)] mb-4 truncate">{order.procedure_name}</p>
+              )}
+              <div className="grid grid-cols-2 gap-3 mb-4">
+                <div className="rounded-xl bg-gray-50 px-3 py-2.5">
+                  <p className="text-[11px] text-[var(--app-text-secondary)] font-medium">Queue</p>
+                  <p className="text-base font-bold text-[var(--app-primary)] tabular-nums mt-0.5">{order.queue_number}</p>
+                </div>
+                <div className="rounded-xl bg-gray-50 px-3 py-2.5">
+                  <p className="text-[11px] text-[var(--app-text-secondary)] font-medium">Room</p>
+                  <p className="text-base font-bold text-emerald-600 tabular-nums mt-0.5">{order.room_number}</p>
+                </div>
+              </div>
+              {isActive && (
+                <div className="rounded-xl bg-orange-50 border border-orange-100 px-4 py-3 mb-4">
+                  <p className="text-orange-800 text-sm font-semibold">Go to {order.room_number}</p>
+                  <p className="text-orange-600/90 text-xs mt-0.5">Queue {order.queue_number}</p>
+                </div>
+              )}
+              {isDone && (
+                <div className="rounded-xl bg-emerald-50 border border-emerald-100 px-4 py-3 mb-4 flex items-center gap-2">
+                  <span className="text-emerald-600 text-lg">✓</span>
+                  <p className="text-emerald-800 text-sm font-semibold">Completed</p>
+                </div>
+              )}
+              <button
+                type="button"
+                onClick={() => {
+                  window.speechSynthesis.speak(new SpeechSynthesisUtterance(`Please proceed to ${order.room_number}. Queue number ${order.queue_number}.`))
+                }}
+                className="w-full h-11 rounded-xl bg-gray-100 text-gray-800 text-sm font-semibold touch-target hover:bg-gray-200 active:scale-[0.98] transition-all duration-150"
+              >
+                Play audio guide
+              </button>
             </div>
-            {order.procedure_name && (
-              <p className="text-sm text-gray-600 mb-3 truncate">{order.procedure_name}</p>
-            )}
-            <div className="grid grid-cols-2 gap-3 mb-3">
-              <div>
-                <p className="text-xs text-gray-500">Queue</p>
-                <p className="text-lg font-bold text-blue-600">{order.queue_number}</p>
-              </div>
-              <div>
-                <p className="text-xs text-gray-500">Room</p>
-                <p className="text-lg font-bold text-green-600">{order.room_number}</p>
-              </div>
-            </div>
-            {order.status === 'in_progress' && (
-              <div className="p-3 rounded-xl bg-orange-50 border border-orange-200 mb-3">
-                <p className="text-orange-800 text-sm font-medium">Go to room {order.room_number}</p>
-                <p className="text-orange-700 text-xs mt-0.5">Queue: {order.queue_number}</p>
-              </div>
-            )}
-            {order.status === 'completed' && (
-              <div className="p-3 rounded-xl bg-green-50 border border-green-200 mb-3">
-                <p className="text-green-800 text-sm font-medium">Completed</p>
-              </div>
-            )}
-            <button
-              type="button"
-              onClick={() => {
-                window.speechSynthesis.speak(new SpeechSynthesisUtterance(`Please proceed to ${order.room_number}. Queue number ${order.queue_number}.`))
-              }}
-              className="w-full h-11 rounded-xl bg-blue-600 text-white text-sm font-medium touch-target active:bg-blue-700"
-            >
-              Play audio guide
-            </button>
           </div>
         )
       })}
